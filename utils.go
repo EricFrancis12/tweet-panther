@@ -53,3 +53,15 @@ func allCharsNumeric(s string) bool {
 	}
 	return true
 }
+
+func popStr(s *string) string {
+	len := len(*s)
+	if len == 0 {
+		return ""
+	}
+
+	last := (*s)[len-1]
+	*s = (*s)[:len-1]
+
+	return string(last)
+}

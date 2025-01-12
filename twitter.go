@@ -93,7 +93,16 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		ipol.RegisterVar(jsonFmt, s)
 	}
 
-	return ipol.Eval(text), nil
+	f := newFuncIpol("|*", "*|")
+	f.RegisterFn("pathEscape", func(args ...string) (string, error) {
+		if len(args) != 1 {
+			return "", fmt.Errorf("pathEscape requires 1 argument, but got (%d) arguments instead", len(args))
+		}
+
+		return url.PathEscape(args[0]), nil
+	})
+
+	return f.Eval(ipol.Eval(text))
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
@@ -124,8 +133,8 @@ func (o PublishTweetOpts) JsonFmts() []string {
 
 	var jsonFmts []string
 
-	for _, partA := range partsA[1:] {
-		partsB := strings.Split(partA, "}}")
+	for _, a := range partsA[1:] {
+		partsB := strings.Split(a, "}}")
 		if len(partsB) == 0 {
 			continue
 		}
