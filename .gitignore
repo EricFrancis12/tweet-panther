@@ -1,0 +1,7 @@
+/bin
+**/*tweet-panther
+**/*.exe
+**/*.msi
+
+**/.env
+**/.env.local
