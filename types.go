@@ -1,5 +1,12 @@
 package main
 
+type PublishTweetType string
+
+const (
+	PublishTweetTypeText      PublishTweetType = "text"
+	PublishTweetTypeFetchJson PublishTweetType = "fetch_json"
+)
+
 const ContentTypeApplicationJson string = "application/json"
 
 const (

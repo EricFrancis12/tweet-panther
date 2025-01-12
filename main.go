@@ -30,7 +30,7 @@ func main() {
 		OAuthToken:       OAuthToken,
 		OAuthTokenSecret: OAuthTokenSecret,
 	}
-	if !creds.areValid() {
+	if !creds.isValid() {
 		log.Fatalf(
 			"required Twitter API credentials from .env: (%s), (%s), (%s), (%s)",
 			EnvAPIKey, EnvAPIKeySecret, EnvOAuthToken, EnvOAuthTokenSecret,

@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -18,16 +22,53 @@ type TwitterAPICreds struct {
 	OAuthTokenSecret string
 }
 
-func (tac TwitterAPICreds) areValid() bool {
+func (tac TwitterAPICreds) isValid() bool {
 	return tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
 }
 
 type PublishTweetOpts struct {
-	Text    string `json:"text"`
-	ReplyTo string `json:"replyTo"`
+	PublishTweetType PublishTweetType `json:"publishTweetType"`
+	Text             string           `json:"text"`
+	ReplyTo          string           `json:"replyTo"`
+	Url              string           `json:"url"`
+	JsonFmt          string           `json:"jsonFmt"`
 }
 
-func (o *PublishTweetOpts) isValidReplyTo() bool {
+func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if o.JsonFmt == "" {
+		return string(body), nil
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return "", err
+	}
+
+	keys := strings.Split(o.JsonFmt, ".")
+	for _, key := range keys {
+		m, ok := data.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("invalid jsonFmt")
+		}
+
+		if data, ok = m[key]; !ok {
+			return "", fmt.Errorf("invalid jsonFmt")
+		}
+	}
+
+	s, ok := data.(string)
+	if !ok {
+		return "", fmt.Errorf("expected string value")
+	}
+	return s, nil
+}
+
+func (o PublishTweetOpts) validReplyTo() bool {
 	tweetID := o.ReplyTo
 
 	parsedURL, err := url.Parse(o.ReplyTo)
@@ -40,6 +81,11 @@ func (o *PublishTweetOpts) isValidReplyTo() bool {
 	}
 
 	return len(tweetID) == 19 && allCharsNumeric(tweetID)
+}
+
+func (o PublishTweetOpts) validUrl() bool {
+	_, err := url.Parse(o.Url)
+	return err == nil
 }
 
 type TwitterClient struct {
@@ -84,9 +130,34 @@ func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTyp
 }
 
 func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
-	if opts.isValidReplyTo() {
-		return c.publishTweetReply(opts.Text, opts.ReplyTo)
+	var text = ""
+	switch opts.PublishTweetType {
+	case PublishTweetTypeText:
+		text = opts.Text
+	case PublishTweetTypeFetchJson:
+		if !opts.validUrl() {
+			return nil, fmt.Errorf("invalid url: %s", opts.Url)
+		}
+
+		resp, err := http.Get(opts.Url)
+		if err != nil {
+			return nil, err
+		}
+
+		text, err = opts.handleFetchJsonResp(resp)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 	}
 
-	return c.publishTweet(opts.Text)
+	if text == "" {
+		return nil, fmt.Errorf("tweet text cannot be an empty string")
+	}
+
+	if opts.validReplyTo() {
+		return c.publishTweetReply(text, opts.ReplyTo)
+	}
+
+	return c.publishTweet(text)
 }
