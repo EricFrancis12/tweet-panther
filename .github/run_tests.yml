@@ -1,0 +1,33 @@
+name: run_tests
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**.go"
+      - "go.mod"
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "**.go"
+      - "go.mod"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: Get dependencies
+        run: go install
+
+      - name: Test code
+        run: make test
