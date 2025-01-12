@@ -36,3 +36,7 @@ Build the executable without running:
 ```bash
 make build
 ```
+
+## License
+
+[MIT](https://mit-license.org)
