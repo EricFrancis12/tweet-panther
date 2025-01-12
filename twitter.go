@@ -123,8 +123,7 @@ func (o PublishTweetOpts) validReplyTo() bool {
 }
 
 func (o PublishTweetOpts) validUrl() bool {
-	_, err := url.Parse(o.Url)
-	return err == nil
+	return isValidUrl(o.Url)
 }
 
 func (o PublishTweetOpts) JsonFmts() []string {

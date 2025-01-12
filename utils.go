@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"os"
 	"strconv"
 
@@ -30,6 +31,11 @@ func SafeLoadEnvs(filenames ...string) error {
 
 func isValidAuthToken(authToken string) bool {
 	return len(authToken) >= 8
+}
+
+func isValidUrl(s string) bool {
+	_, err := url.Parse(s)
+	return err == nil
 }
 
 func ensurePrefix(s, prefix string) string {

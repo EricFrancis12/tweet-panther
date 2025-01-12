@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -70,6 +71,10 @@ func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
 
 func (a *API) init() {
 	a.router.HandleFunc("/api/tweet", a.auth(a.handlePublishTweet)).Methods(http.MethodPost)
+
+	a.router.HandleFunc("/healthz", handleHealthz)
+	a.router.HandleFunc("/", handleCatchAll)
+	a.router.HandleFunc(`/{catchAll:[a-zA-Z0-9=\-\/.]+}`, handleCatchAll)
 }
 
 func (a *API) run() error {
@@ -91,4 +96,18 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeOK(w, output)
+}
+
+func handleHealthz(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, struct{}{})
+}
+
+func handleCatchAll(w http.ResponseWriter, r *http.Request) {
+	redirectUrl := os.Getenv(EnvCatchAllRedirectUrl)
+	if isValidUrl(redirectUrl) {
+		redirectVisitor(w, r, redirectUrl)
+		return
+	}
+
+	writeNotFound(w)
 }
