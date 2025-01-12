@@ -21,13 +21,6 @@ func (b *ByteReadCloser) Close() error {
 	return nil
 }
 
-type PublishTweetType string
-
-const (
-	PublishTweetTypeText      PublishTweetType = "text"
-	PublishTweetTypeFetchJson PublishTweetType = "fetch_json"
-)
-
 const ContentTypeApplicationJson string = "application/json"
 
 const (
@@ -43,4 +36,18 @@ const (
 const (
 	HTTPHeaderAuthorization string = "Authorization"
 	HTTPHeaderContentType   string = "Content-Type"
+)
+
+type LogLevel string
+
+const (
+	LogLevelInfo  LogLevel = "info"
+	LogLevelError LogLevel = "error"
+)
+
+type PublishTweetType string
+
+const (
+	PublishTweetTypeText      PublishTweetType = "text"
+	PublishTweetTypeFetchJson PublishTweetType = "fetch_json"
 )

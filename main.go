@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 )
@@ -42,7 +41,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("API running at %s\n", Port)
+	api.Infof("API running at %s\n", Port)
 	if err := api.run(); err != nil {
 		log.Fatal(err)
 	}

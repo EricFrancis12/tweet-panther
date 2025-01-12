@@ -4,22 +4,20 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
-func fileExists(filepath string) bool {
-	_, err := os.Stat(filepath)
-	if os.IsNotExist(err) {
-		return false
-	}
+func exists(path string) bool {
+	_, err := os.Stat(path)
 	return err == nil
 }
 
 func SafeLoadEnvs(filenames ...string) error {
 	validFilenames := []string{}
 	for _, fn := range filenames {
-		if fileExists(fn) {
+		if exists(fn) {
 			validFilenames = append(validFilenames, fn)
 		}
 	}
@@ -46,7 +44,7 @@ func ensurePrefix(s, prefix string) string {
 		return prefix
 	}
 
-	if string(s[0]) == prefix {
+	if strings.HasPrefix(s, prefix) {
 		return s
 	}
 

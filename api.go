@@ -27,8 +27,10 @@ func newAPIResp(success bool, msg string, data any) *APIResp {
 type API struct {
 	listenAddr string
 	authToken  string
+	handler    http.Handler
 	router     *mux.Router
 	client     *TwitterClient
+	*Logger
 }
 
 func newAPI(listenAddr string, authToken string, creds TwitterAPICreds) (*API, error) {
@@ -47,10 +49,17 @@ func newAPI(listenAddr string, authToken string, creds TwitterAPICreds) (*API, e
 		authToken:  authToken,
 		router:     mux.NewRouter(),
 		client:     client,
+		Logger:     newLogger(),
 	}
+	api.handler = api
 	api.init()
 
 	return api, nil
+}
+
+func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.Infof("%s @ %s\n", r.Method, r.URL.Path)
+	a.router.ServeHTTP(w, r)
 }
 
 func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
@@ -72,42 +81,47 @@ func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
 func (a *API) init() {
 	a.router.HandleFunc("/api/tweet", a.auth(a.handlePublishTweet)).Methods(http.MethodPost)
 
-	a.router.HandleFunc("/healthz", handleHealthz)
-	a.router.HandleFunc("/", handleCatchAll)
-	a.router.HandleFunc(`/{catchAll:[a-zA-Z0-9=\-\/.]+}`, handleCatchAll)
+	a.router.HandleFunc("/healthz", a.handleHealthz)
+	a.router.HandleFunc("/", a.handleCatchAll)
+	a.router.HandleFunc(`/{catchAll:[a-zA-Z0-9=\-\/.]+}`, a.handleCatchAll)
 }
 
 func (a *API) run() error {
-	return http.ListenAndServe(a.listenAddr, a.router)
+	return http.ListenAndServe(a.listenAddr, a)
 }
 
 func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 	var opts PublishTweetOpts
 	err := json.NewDecoder(r.Body).Decode(&opts)
 	if err != nil {
-		writeBadRequest(w, err)
+		a.Errorf("error decoding json: %s", err.Error())
+		writeBadRequest(w, nil)
 		return
 	}
 
 	output, err := a.client.handle(opts)
 	if err != nil {
-		writeInternalServerError(w, err)
+		a.Errorf("error publishing Tweet: %s", err.Error())
+		writeInternalServerError(w, nil)
 		return
 	}
 
+	a.Infof("Published new Tweet (%s): %s", *output.Data.ID, *output.Data.Text)
 	writeOK(w, output)
 }
 
-func handleHealthz(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 
-func handleCatchAll(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleCatchAll(w http.ResponseWriter, r *http.Request) {
 	redirectUrl := os.Getenv(EnvCatchAllRedirectUrl)
 	if isValidUrl(redirectUrl) {
+		a.Infof("Redirecting visitor to %s\n", redirectUrl)
 		redirectVisitor(w, r, redirectUrl)
 		return
 	}
 
+	a.Infof("Route not found: %s\n", r.URL.Path)
 	writeNotFound(w)
 }
