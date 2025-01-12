@@ -1,5 +1,26 @@
 package main
 
+import "bytes"
+
+type ByteReadCloser struct {
+	reader *bytes.Reader
+}
+
+func NewByteReadCloser(data []byte) *ByteReadCloser {
+	return &ByteReadCloser{
+		reader: bytes.NewReader(data),
+	}
+}
+
+func (b *ByteReadCloser) Read(p []byte) (n int, err error) {
+	return b.reader.Read(p)
+}
+
+func (b *ByteReadCloser) Close() error {
+	b.reader = nil
+	return nil
+}
+
 type PublishTweetType string
 
 const (

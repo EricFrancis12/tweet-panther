@@ -1,59 +1,98 @@
 package main
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-type ByteReadCloser struct {
-	reader *bytes.Reader
-}
-
-func NewByteReadCloser(data []byte) *ByteReadCloser {
-	return &ByteReadCloser{
-		reader: bytes.NewReader(data),
-	}
-}
-
-func (b *ByteReadCloser) Read(p []byte) (n int, err error) {
-	return b.reader.Read(p)
-}
-
-func (b *ByteReadCloser) Close() error {
-	b.reader = nil
-	return nil
-}
-
 type JsonFmtTest struct {
-	jsonFmt  string
-	expected string
+	jsonFmt   string
+	expected  string
+	shouldErr bool
 }
 
-func newJsonFmtTest(jsonFmt, expected string) *JsonFmtTest {
+func newJsonFmtTest(jsonFmt, expected string, shouldErr bool) *JsonFmtTest {
 	return &JsonFmtTest{
-		jsonFmt:  jsonFmt,
-		expected: expected,
+		jsonFmt:   jsonFmt,
+		expected:  expected,
+		shouldErr: shouldErr,
 	}
 }
 
 func TestHandleFetchJsonResp(t *testing.T) {
-	resp := &http.Response{
-		Body: NewByteReadCloser([]byte(`{
-			"data": {
-				"post": {
-					"title": "My Awesome Title",
-					"timestamp": 12345678
-				}
+	jsonStr := []byte(`{
+		"data": {
+			"post": {
+				"title": "My Awesome Title",
+				"timestamp": 12345678,
+				"foo": true,
+				"bar": false,
+				"tags": [
+					"Awesome",
+					"Cool"
+				],
+				"stats": {
+					"status": "published",
+					"traffic": 87654321,
+					"trending": false,
+					"hot": true,
+					"more": {
+						"some": "data"
+					},
+					"items": [
+						"foo",
+						"bar",
+						"baz"
+					]
+				},
+				"authors": [
+					{
+						"name": "Jim"
+					},
+					{
+						"name": "Bob"
+					}
+				]
 			}
-		}`)),
-	}
+		}
+	}`)
 
 	jsonFmtTests := []*JsonFmtTest{
-		newJsonFmtTest("data.post.title", "My Awesome Title"),
-		// TODO: newJsonFmtTest("data.post.timestamp", "12345678"),
+		// Empty string
+		newJsonFmtTest("", string(jsonStr), false),
+
+		// Non-existing field
+		newJsonFmtTest("stuff", "", true),
+
+		// Post fields
+		newJsonFmtTest("data.post.title", "My Awesome Title", false),
+		newJsonFmtTest("data.post.timestamp", "12345678", false),
+		newJsonFmtTest("data.post.foo", "true", false),
+		newJsonFmtTest("data.post.bar", "false", false),
+		newJsonFmtTest("data.post.tags", `["Awesome","Cool"]`, false),
+
+		// Nested object
+		newJsonFmtTest("data.post.stats.status", "published", false),
+		newJsonFmtTest("data.post.stats.traffic", "87654321", false),
+		newJsonFmtTest("data.post.stats.trending", "false", false),
+		newJsonFmtTest("data.post.stats.hot", "true", false),
+		newJsonFmtTest("data.post.stats.more", `{"some":"data"}`, false),
+		newJsonFmtTest("data.post.stats.more.some", "data", false),
+		newJsonFmtTest("data.post.stats.items", `["foo","bar","baz"]`, false),
+
+		// Indexing inside of array (TODO: not yet implimented)
+		newJsonFmtTest("data.post.stats.items[0]", "", true),
+		newJsonFmtTest("data.post.stats.items[1]", "", true),
+		newJsonFmtTest("data.post.stats.items[2]", "", true),
+
+		// Objects inside of array
+		newJsonFmtTest("data.post.authors", `[{"name":"Jim"},{"name":"Bob"}]`, false),
+
+		// Indexing objects inside of array (TODO: not yet implimented)
+		newJsonFmtTest("data.post.authors[0]", "", true),
+		newJsonFmtTest("data.post.authors[1]", "", true),
 	}
 
 	for _, j := range jsonFmtTests {
@@ -61,8 +100,18 @@ func TestHandleFetchJsonResp(t *testing.T) {
 			JsonFmt: j.jsonFmt,
 		}
 
+		// A new *http.Response is needed for each j,
+		// because handleFetchJsonResp() clears the response body
+		resp := &http.Response{
+			Body: NewByteReadCloser(jsonStr),
+		}
+
 		s, err := opts.handleFetchJsonResp(resp)
-		assert.Nil(t, err)
 		assert.Equal(t, j.expected, s)
+		if j.shouldErr {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+		}
 	}
 }

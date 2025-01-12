@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/michimani/gotwi"
@@ -45,7 +47,9 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	}
 
 	var data interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
+	d := json.NewDecoder(bytes.NewReader(body))
+	d.UseNumber()
+	if err := d.Decode(&data); err != nil {
 		return "", err
 	}
 
@@ -61,11 +65,22 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		}
 	}
 
-	s, ok := data.(string)
-	if !ok {
-		return "", fmt.Errorf("expected string value")
+	switch d := data.(type) {
+	case string:
+		return d, nil
+	case int64:
+		return fmt.Sprintf("%d", d), nil
+	case float64:
+		return fmt.Sprintf("%f", d), nil
+	case bool:
+		return strconv.FormatBool(d), nil
+	default:
+		b, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
 	}
-	return s, nil
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
