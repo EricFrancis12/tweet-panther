@@ -56,7 +56,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	var (
 		level = data
 		text  = o.Text
-		ipol  = stripol.New("{{", "}}")
+		ipol  = stripol.New("{*{", "}*}")
 	)
 
 	for _, jsonFmt := range o.JsonFmts() {
@@ -131,7 +131,7 @@ func (o PublishTweetOpts) validUrl() bool {
 }
 
 func (o PublishTweetOpts) JsonFmts() []string {
-	partsA := strings.Split(o.Text, "{{")
+	partsA := strings.Split(o.Text, "{*{")
 	if len(partsA) == 0 {
 		return []string{}
 	}
@@ -139,7 +139,7 @@ func (o PublishTweetOpts) JsonFmts() []string {
 	var jsonFmts []string
 
 	for _, a := range partsA[1:] {
-		partsB := strings.Split(a, "}}")
+		partsB := strings.Split(a, "}*}")
 		if len(partsB) == 0 {
 			continue
 		}
