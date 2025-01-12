@@ -54,26 +54,27 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	}
 
 	var (
-		text = o.Text
-		ipol = stripol.New("{{", "}}")
+		level = data
+		text  = o.Text
+		ipol  = stripol.New("{{", "}}")
 	)
 
 	for _, jsonFmt := range o.JsonFmts() {
 		keys := strings.Split(jsonFmt, ".")
 		for _, key := range keys {
-			m, ok := data.(map[string]interface{})
+			m, ok := level.(map[string]interface{})
 			if !ok {
-				return "", errors.New("invalid jsonFmt")
+				return "", errors.New("invalid jsonFmt A")
 			}
 
-			if data, ok = m[key]; !ok {
-				return "", errors.New("invalid jsonFmt")
+			if level, ok = m[key]; !ok {
+				return "", errors.New("invalid jsonFmt B")
 			}
 		}
 
 		var s string
 
-		switch d := data.(type) {
+		switch d := level.(type) {
 		case string:
 			s = d
 		case int64:
@@ -83,7 +84,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		case bool:
 			s = strconv.FormatBool(d)
 		default:
-			b, err := json.Marshal(data)
+			b, err := json.Marshal(level)
 			if err != nil {
 				return "", err
 			}
@@ -91,6 +92,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		}
 
 		ipol.RegisterVar(jsonFmt, s)
+		level = data
 	}
 
 	f := newFuncIpol("|*", "*|")
