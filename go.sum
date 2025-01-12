@@ -1,3 +1,5 @@
+github.com/EricFrancis12/stripol v0.0.0-20241202174442-52e8b4a438fd h1:J5L9BFHvaN8OF384j7cr+X+R3NwW3M73bU7CF0bwqYs=
+github.com/EricFrancis12/stripol v0.0.0-20241202174442-52e8b4a438fd/go.mod h1:QYI8NmVpfQWRnADN/RfRfHVZ2Ptemtkis8WD3cdKvaM=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=

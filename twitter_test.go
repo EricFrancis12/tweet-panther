@@ -7,111 +7,143 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type JsonFmtTest struct {
-	jsonFmt   string
-	expected  string
-	shouldErr bool
-}
+func TestPublishTweetOpts(t *testing.T) {
+	t.Run("Test handleFetchJsonResp()", func(t *testing.T) {
+		type PublishTweetOptsTest struct {
+			text      string
+			expected  string
+			shouldErr bool
+		}
 
-func newJsonFmtTest(jsonFmt, expected string, shouldErr bool) *JsonFmtTest {
-	return &JsonFmtTest{
-		jsonFmt:   jsonFmt,
-		expected:  expected,
-		shouldErr: shouldErr,
-	}
-}
-
-func TestHandleFetchJsonResp(t *testing.T) {
-	jsonStr := []byte(`{
-		"data": {
-			"post": {
-				"title": "My Awesome Title",
-				"timestamp": 12345678,
-				"foo": true,
-				"bar": false,
-				"tags": [
-					"Awesome",
-					"Cool"
-				],
-				"stats": {
-					"status": "published",
-					"traffic": 87654321,
-					"trending": false,
-					"hot": true,
-					"more": {
-						"some": "data"
-					},
-					"items": [
-						"foo",
-						"bar",
-						"baz"
-					]
-				},
-				"authors": [
-					{
-						"name": "Jim"
-					},
-					{
-						"name": "Bob"
-					}
-				]
+		var newPublishTweetOptsTest = func(text, expected string, shouldErr bool) *PublishTweetOptsTest {
+			return &PublishTweetOptsTest{
+				text:      text,
+				expected:  expected,
+				shouldErr: shouldErr,
 			}
 		}
-	}`)
 
-	jsonFmtTests := []*JsonFmtTest{
-		// Empty string
-		newJsonFmtTest("", string(jsonStr), false),
+		jsonBytes := []byte(`{
+			"data": {
+				"post": {
+					"title": "My Awesome Title",
+					"timestamp": 12345678,
+					"foo": true,
+					"bar": false,
+					"tags": [
+						"Awesome",
+						"Cool"
+					],
+					"stats": {
+						"status": "published",
+						"traffic": 87654321,
+						"trending": false,
+						"hot": true,
+						"more": {
+							"some": "data"
+						},
+						"items": [
+							"foo",
+							"bar",
+							"baz"
+						]
+					},
+					"authors": [
+						{
+							"name": "Jim"
+						},
+						{
+							"name": "Bob"
+						}
+					]
+				}
+			}
+		}`)
 
-		// Non-existing field
-		newJsonFmtTest("stuff", "", true),
+		tests := []*PublishTweetOptsTest{
+			// Empty string
+			newPublishTweetOptsTest("", string(jsonBytes), false),
 
-		// Post fields
-		newJsonFmtTest("data.post.title", "My Awesome Title", false),
-		newJsonFmtTest("data.post.timestamp", "12345678", false),
-		newJsonFmtTest("data.post.foo", "true", false),
-		newJsonFmtTest("data.post.bar", "false", false),
-		newJsonFmtTest("data.post.tags", `["Awesome","Cool"]`, false),
+			// No substitutions
+			newPublishTweetOptsTest("some text", "some text", false),
 
-		// Nested object
-		newJsonFmtTest("data.post.stats.status", "published", false),
-		newJsonFmtTest("data.post.stats.traffic", "87654321", false),
-		newJsonFmtTest("data.post.stats.trending", "false", false),
-		newJsonFmtTest("data.post.stats.hot", "true", false),
-		newJsonFmtTest("data.post.stats.more", `{"some":"data"}`, false),
-		newJsonFmtTest("data.post.stats.more.some", "data", false),
-		newJsonFmtTest("data.post.stats.items", `["foo","bar","baz"]`, false),
+			// Non-existing fields
+			newPublishTweetOptsTest("{{ stuff }}", "", true),
+			newPublishTweetOptsTest("{{ data.stuff }}", "", true),
 
-		// Indexing inside of array (TODO: not yet implimented)
-		newJsonFmtTest("data.post.stats.items[0]", "", true),
-		newJsonFmtTest("data.post.stats.items[1]", "", true),
-		newJsonFmtTest("data.post.stats.items[2]", "", true),
+			// Post fields
+			newPublishTweetOptsTest("{{ data.post.title }}", "My Awesome Title", false),
+			newPublishTweetOptsTest("{{ data.post.timestamp }}", "12345678", false),
+			newPublishTweetOptsTest("{{ data.post.foo }}", "true", false),
+			newPublishTweetOptsTest("{{ data.post.bar }}", "false", false),
+			newPublishTweetOptsTest("{{ data.post.tags }}", `["Awesome","Cool"]`, false),
 
-		// Objects inside of array
-		newJsonFmtTest("data.post.authors", `[{"name":"Jim"},{"name":"Bob"}]`, false),
+			// Nested object
+			newPublishTweetOptsTest("{{ data.post.stats.status }}", "published", false),
+			newPublishTweetOptsTest("{{ data.post.stats.traffic }}", "87654321", false),
+			newPublishTweetOptsTest("{{ data.post.stats.trending }}", "false", false),
+			newPublishTweetOptsTest("{{ data.post.stats.hot }}", "true", false),
+			newPublishTweetOptsTest("{{ data.post.stats.more }}", `{"some":"data"}`, false),
+			newPublishTweetOptsTest("{{ data.post.stats.more.some }}", "data", false),
+			newPublishTweetOptsTest("{{ data.post.stats.items }}", `["foo","bar","baz"]`, false),
 
-		// Indexing objects inside of array (TODO: not yet implimented)
-		newJsonFmtTest("data.post.authors[0]", "", true),
-		newJsonFmtTest("data.post.authors[1]", "", true),
-	}
+			// Indexing inside of array (TODO: not yet implimented)
+			newPublishTweetOptsTest("{{ data.post.stats.items[0] }}", "", true),
+			newPublishTweetOptsTest("{{ data.post.stats.items[1] }}", "", true),
+			newPublishTweetOptsTest("{{ data.post.stats.items[2] }}", "", true),
 
-	for _, j := range jsonFmtTests {
-		opts := PublishTweetOpts{
-			JsonFmt: j.jsonFmt,
+			// Objects inside of array
+			newPublishTweetOptsTest("{{ data.post.authors }}", `[{"name":"Jim"},{"name":"Bob"}]`, false),
+
+			// Indexing objects inside of array (TODO: not yet implimented)
+			newPublishTweetOptsTest("{{ data.post.authors[0] }}", "", true),
+			newPublishTweetOptsTest("{{ data.post.authors[1] }}", "", true),
 		}
 
-		// A new *http.Response is needed for each j,
-		// because handleFetchJsonResp() clears the response body
-		resp := &http.Response{
-			Body: NewByteReadCloser(jsonStr),
+		for _, test := range tests {
+			opts := PublishTweetOpts{
+				Text: test.text,
+			}
+
+			// A new *http.Response is needed for each test,
+			// because handleFetchJsonResp() clears the response body
+			resp := &http.Response{
+				Body: NewByteReadCloser(jsonBytes),
+			}
+
+			s, err := opts.handleFetchJsonResp(resp)
+			assert.Equal(t, test.expected, s)
+			if test.shouldErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		}
+	})
+
+	t.Run("Test jsonFmts()", func(t *testing.T) {
+		type JsonFmtsTest struct {
+			text     string
+			expected []string
 		}
 
-		s, err := opts.handleFetchJsonResp(resp)
-		assert.Equal(t, j.expected, s)
-		if j.shouldErr {
-			assert.NotNil(t, err)
-		} else {
-			assert.Nil(t, err)
+		tests := []JsonFmtsTest{
+			{
+				text:     "The article title is {{ data.post.title }}.",
+				expected: []string{"data.post.title"},
+			},
+			{
+				text:     "The article title is {{ data.post.title }}, and the timestamp is {{ data.post.timestamp }}.",
+				expected: []string{"data.post.title", "data.post.timestamp"},
+			},
 		}
-	}
+
+		for _, test := range tests {
+			opts := PublishTweetOpts{
+				Text: test.text,
+			}
+
+			assert.Equal(t, test.expected, opts.JsonFmts())
+		}
+	})
 }

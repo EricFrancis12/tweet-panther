@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/EricFrancis12/stripol"
 	"github.com/michimani/gotwi"
-
 	"github.com/michimani/gotwi/tweet/managetweet"
 	managetweetTypes "github.com/michimani/gotwi/tweet/managetweet/types"
 )
@@ -33,7 +34,6 @@ type PublishTweetOpts struct {
 	Text             string           `json:"text"`
 	ReplyTo          string           `json:"replyTo"`
 	Url              string           `json:"url"`
-	JsonFmt          string           `json:"jsonFmt"`
 }
 
 func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
@@ -42,7 +42,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		return "", err
 	}
 
-	if o.JsonFmt == "" {
+	if o.Text == "" {
 		return string(body), nil
 	}
 
@@ -53,34 +53,47 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 		return "", err
 	}
 
-	keys := strings.Split(o.JsonFmt, ".")
-	for _, key := range keys {
-		m, ok := data.(map[string]interface{})
-		if !ok {
-			return "", fmt.Errorf("invalid jsonFmt")
+	var (
+		text = o.Text
+		ipol = stripol.New("{{", "}}")
+	)
+
+	for _, jsonFmt := range o.JsonFmts() {
+		keys := strings.Split(jsonFmt, ".")
+		for _, key := range keys {
+			m, ok := data.(map[string]interface{})
+			if !ok {
+				return "", errors.New("invalid jsonFmt")
+			}
+
+			if data, ok = m[key]; !ok {
+				return "", errors.New("invalid jsonFmt")
+			}
 		}
 
-		if data, ok = m[key]; !ok {
-			return "", fmt.Errorf("invalid jsonFmt")
+		var s string
+
+		switch d := data.(type) {
+		case string:
+			s = d
+		case int64:
+			s = fmt.Sprintf("%d", d)
+		case float64:
+			s = fmt.Sprintf("%f", d)
+		case bool:
+			s = strconv.FormatBool(d)
+		default:
+			b, err := json.Marshal(data)
+			if err != nil {
+				return "", err
+			}
+			s = string(b)
 		}
+
+		ipol.RegisterVar(jsonFmt, s)
 	}
 
-	switch d := data.(type) {
-	case string:
-		return d, nil
-	case int64:
-		return fmt.Sprintf("%d", d), nil
-	case float64:
-		return fmt.Sprintf("%f", d), nil
-	case bool:
-		return strconv.FormatBool(d), nil
-	default:
-		b, err := json.Marshal(data)
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
-	}
+	return ipol.Eval(text), nil
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
@@ -101,6 +114,27 @@ func (o PublishTweetOpts) validReplyTo() bool {
 func (o PublishTweetOpts) validUrl() bool {
 	_, err := url.Parse(o.Url)
 	return err == nil
+}
+
+func (o PublishTweetOpts) JsonFmts() []string {
+	partsA := strings.Split(o.Text, "{{")
+	if len(partsA) == 0 {
+		return []string{}
+	}
+
+	var jsonFmts []string
+
+	for _, partA := range partsA[1:] {
+		partsB := strings.Split(partA, "}}")
+		if len(partsB) == 0 {
+			continue
+		}
+
+		trimmed := strings.TrimSpace(partsB[0])
+		jsonFmts = append(jsonFmts, trimmed)
+	}
+
+	return jsonFmts
 }
 
 type TwitterClient struct {
@@ -167,7 +201,7 @@ func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateO
 	}
 
 	if text == "" {
-		return nil, fmt.Errorf("tweet text cannot be an empty string")
+		return nil, errors.New("tweet text cannot be an empty string")
 	}
 
 	if opts.validReplyTo() {
