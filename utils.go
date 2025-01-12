@@ -34,6 +34,9 @@ func isValidAuthToken(authToken string) bool {
 }
 
 func isValidUrl(s string) bool {
+	if s == "" {
+		return false
+	}
 	_, err := url.Parse(s)
 	return err == nil
 }

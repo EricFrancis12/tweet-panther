@@ -108,6 +108,10 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
+	if o.ReplyTo == "" {
+		return false
+	}
+
 	tweetID := o.ReplyTo
 
 	parsedURL, err := url.Parse(o.ReplyTo)
