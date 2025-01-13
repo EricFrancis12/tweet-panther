@@ -58,7 +58,7 @@ func newAPI(listenAddr string, authToken string, creds TwitterAPICreds) (*API, e
 }
 
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	a.Infof("%s @ %s\n", r.Method, r.URL.Path)
+	a.Infof("%s @ %s (%s)\n", r.Method, r.URL.Path, r.RemoteAddr)
 	a.router.ServeHTTP(w, r)
 }
 
@@ -101,7 +101,7 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 
 	output, err := a.client.handle(opts)
 	if err != nil {
-		a.Errorf("error publishing Tweet: %s", err.Error())
+		a.LogErr(err)
 		writeInternalServerError(w, nil)
 		return
 	}

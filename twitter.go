@@ -178,7 +178,12 @@ func (c *TwitterClient) publishTweet(text string) (*managetweetTypes.CreateOutpu
 		Text: gotwi.String(text),
 	}
 
-	return managetweet.Create(context.Background(), c.Client, p)
+	output, err := managetweet.Create(context.Background(), c.Client, p)
+	if err != nil {
+		return nil, fmt.Errorf("error publishing tweet ( %s ): %s", text, err.Error())
+	}
+
+	return output, nil
 }
 
 func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTypes.CreateOutput, error) {
@@ -189,7 +194,12 @@ func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTyp
 		},
 	}
 
-	return managetweet.Create(context.Background(), c.Client, p)
+	output, err := managetweet.Create(context.Background(), c.Client, p)
+	if err != nil {
+		return nil, fmt.Errorf("error publishing tweet reply ( %s ): %s", text, err.Error())
+	}
+
+	return output, nil
 }
 
 func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
