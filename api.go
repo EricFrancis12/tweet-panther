@@ -99,6 +99,8 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.Infoln(opts.String())
+
 	output, err := a.client.handle(opts)
 	if err != nil {
 		a.LogErr(err)

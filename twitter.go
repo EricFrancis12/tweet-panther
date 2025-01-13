@@ -151,6 +151,16 @@ func (o PublishTweetOpts) JsonFmts() []string {
 	return jsonFmts
 }
 
+func (o PublishTweetOpts) String() string {
+	return fmt.Sprintf(
+		"PublishTweetOpts{ PublishTweetType: %s, Text: %s, ReplyTo: %s, Url: %s }",
+		o.PublishTweetType,
+		o.Text,
+		o.ReplyTo,
+		o.Url,
+	)
+}
+
 type TwitterClient struct {
 	*gotwi.Client
 }
