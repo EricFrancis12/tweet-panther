@@ -46,6 +46,6 @@ func (l Logger) Errorln(message string) {
 
 func (l Logger) LogErr(err error) {
 	if err != nil {
-		l.Log(LogLevelError, err.Error())
+		l.Errorln(err.Error())
 	}
 }

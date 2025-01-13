@@ -94,7 +94,7 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 	var opts PublishTweetOpts
 	err := json.NewDecoder(r.Body).Decode(&opts)
 	if err != nil {
-		a.Errorf("error decoding json: %s", err.Error())
+		a.Errorf("error decoding json: %s\n", err.Error())
 		writeBadRequest(w, nil)
 		return
 	}
@@ -106,7 +106,7 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.Infof("Published new Tweet (%s): %s", *output.Data.ID, *output.Data.Text)
+	a.Infof("Published new Tweet (%s): %s\n", *output.Data.ID, *output.Data.Text)
 	writeOK(w, output)
 }
 
