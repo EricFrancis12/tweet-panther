@@ -14,10 +14,10 @@ func newLogger() *Logger {
 func (l Logger) Log(level LogLevel, message string) {
 	timestamp := time.Now().Format(time.UnixDate)
 	if level == LogLevelInfo {
-		fmt.Printf("[%s] %s", timestamp, message)
+		fmt.Printf("[%s] %s\n", timestamp, message)
 		return
 	}
-	fmt.Printf("[%s] [%s] %s", timestamp, level, message)
+	fmt.Printf("[%s] [%s] %s\n", timestamp, level, message)
 }
 
 func (l Logger) Info(message string) {

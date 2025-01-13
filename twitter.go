@@ -107,9 +107,9 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	return f.Eval(ipol.Eval(text))
 }
 
-func (o PublishTweetOpts) validReplyTo() bool {
+func (o PublishTweetOpts) replyToTweetID() (string, error) {
 	if o.ReplyTo == "" {
-		return false
+		return "", errors.New("replyTo is an empty string")
 	}
 
 	tweetID := o.ReplyTo
@@ -118,12 +118,21 @@ func (o PublishTweetOpts) validReplyTo() bool {
 	if err == nil {
 		parts := strings.Split(parsedURL.Path, "/")
 		if len(parts) < 1 {
-			return false
+			return "", fmt.Errorf("expected length of at least 1, but got: %d", len(parts))
 		}
 		tweetID = parts[len(parts)-1]
 	}
 
-	return len(tweetID) == 19 && allCharsNumeric(tweetID)
+	if len(tweetID) == 19 && allCharsNumeric(tweetID) {
+		return tweetID, nil
+	}
+
+	return "", fmt.Errorf("tweet ID must be 19 characters long, and contain only numeric characters (received: %s)", tweetID)
+}
+
+func (o PublishTweetOpts) validReplyTo() bool {
+	_, err := o.replyToTweetID()
+	return err == nil
 }
 
 func (o PublishTweetOpts) validUrl() bool {

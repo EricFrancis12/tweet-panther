@@ -121,6 +121,53 @@ func TestPublishTweetOpts(t *testing.T) {
 		}
 	})
 
+	t.Run("Test validReplyTo()", func(t *testing.T) {
+		type ValidReplyToTest struct {
+			replyTo  string
+			expected bool
+		}
+
+		tests := []ValidReplyToTest{
+			// Empty string
+			{
+				replyTo:  "",
+				expected: false,
+			},
+
+			// Proper usage
+			{
+				replyTo:  "1234567890123456789",
+				expected: true,
+			},
+			{
+				replyTo:  "https://twitter.com/user/status/1234567890123456789",
+				expected: true,
+			},
+
+			// Invalid Tweet ID
+			{
+				replyTo:  "https://twitter.com/user/status/123",
+				expected: false,
+			},
+			{
+				replyTo:  "https://twitter.com/user/status/abc",
+				expected: false,
+			},
+			{
+				replyTo:  "https://twitter.com/user/status/abcdefghijklmnopqrs",
+				expected: false,
+			},
+		}
+
+		for _, test := range tests {
+			opts := PublishTweetOpts{
+				ReplyTo: test.replyTo,
+			}
+
+			assert.Equal(t, test.expected, opts.validReplyTo())
+		}
+	})
+
 	t.Run("Test jsonFmts()", func(t *testing.T) {
 		type JsonFmtsTest struct {
 			text     string
