@@ -116,7 +116,8 @@ func (o PublishTweetOpts) replyToTweetID() (string, error) {
 
 	parsedURL, err := url.Parse(o.ReplyTo)
 	if err == nil {
-		parts := strings.Split(parsedURL.Path, "/")
+		path := remSuffixIfExists(parsedURL.Path, "/")
+		parts := strings.Split(path, "/")
 		if len(parts) < 1 {
 			return "", fmt.Errorf("expected length of at least 1, but got: %d", len(parts))
 		}
@@ -248,7 +249,11 @@ func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateO
 	}
 
 	if opts.validReplyTo() {
-		return c.publishTweetReply(text, opts.ReplyTo)
+		tweetID, err := opts.replyToTweetID()
+		if err != nil {
+			return nil, err
+		}
+		return c.publishTweetReply(text, tweetID)
 	}
 
 	return c.publishTweet(text)

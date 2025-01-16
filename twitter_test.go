@@ -121,6 +121,96 @@ func TestPublishTweetOpts(t *testing.T) {
 		}
 	})
 
+	t.Run("Test replyToTweetID()", func(t *testing.T) {
+		type ReplyToTweetIDTest struct {
+			replyTo   string
+			expected  string
+			shouldErr bool
+		}
+
+		tests := []ReplyToTweetIDTest{
+			// Empty string
+			{
+				replyTo:   "",
+				expected:  "",
+				shouldErr: true,
+			},
+
+			// ReplyTo Tweet id
+			{
+				replyTo:   "1234567890123456789",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+
+			// ReplyTo Tweet urls
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789/",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789/?",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789?",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789?=",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789?qa=",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789?a=123",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789?a=123&b=456",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789#",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+			{
+				replyTo:   "https://twitter.com/user/status/1234567890123456789#abc",
+				expected:  "1234567890123456789",
+				shouldErr: false,
+			},
+		}
+
+		for _, test := range tests {
+			opts := PublishTweetOpts{
+				ReplyTo: test.replyTo,
+			}
+
+			tweetID, err := opts.replyToTweetID()
+			assert.Equal(t, test.expected, tweetID)
+			if test.shouldErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		}
+	})
+
 	t.Run("Test validReplyTo()", func(t *testing.T) {
 		type ValidReplyToTest struct {
 			replyTo  string

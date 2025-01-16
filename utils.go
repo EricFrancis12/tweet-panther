@@ -51,6 +51,19 @@ func ensurePrefix(s, prefix string) string {
 	return prefix + s
 }
 
+func remSuffixIfExists(s, suffix string) string {
+	if len(s) == 0 {
+		return ""
+	}
+
+	i := len(s) - len(suffix)
+	if len(s) >= len(suffix) && s[i:] == suffix {
+		return s[:i]
+	}
+
+	return s
+}
+
 func allCharsNumeric(s string) bool {
 	for _, c := range s {
 		_, err := strconv.Atoi(string(c))
