@@ -85,3 +85,12 @@ func popStr(s *string) string {
 
 	return string(last)
 }
+
+func containsAnySubstrs(s string, substrs ...string) bool {
+	for _, substr := range substrs {
+		if strings.Contains(s, substr) {
+			return true
+		}
+	}
+	return false
+}

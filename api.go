@@ -33,7 +33,7 @@ type API struct {
 	*Logger
 }
 
-func newAPI(listenAddr string, authToken string, creds TwitterAPICreds) (*API, error) {
+func newAPI(listenAddr string, authToken string, creds ...TwitterAPICreds) (*API, error) {
 	la := ensurePrefix(listenAddr, ":")
 	if !allCharsNumeric(la[1:]) {
 		return nil, fmt.Errorf("invalid listen address: %s", listenAddr)

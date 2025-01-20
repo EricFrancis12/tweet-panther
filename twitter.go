@@ -29,6 +29,16 @@ func (tac TwitterAPICreds) isValid() bool {
 	return tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
 }
 
+func (tac TwitterAPICreds) String() string {
+	return fmt.Sprintf(
+		"TwitterAPICreds{ APIKey: %s, APIKeySecret: %s, OAuthToken: %s, OAuthTokenSecret: %s }",
+		tac.APIKey,
+		tac.APIKeySecret,
+		tac.OAuthToken,
+		tac.OAuthTokenSecret,
+	)
+}
+
 type PublishTweetOpts struct {
 	PublishTweetType PublishTweetType `json:"publishTweetType"`
 	Text             string           `json:"text"`
@@ -172,38 +182,62 @@ func (o PublishTweetOpts) String() string {
 }
 
 type TwitterClient struct {
-	*gotwi.Client
+	clients []*gotwi.Client
 }
 
-func newTwitterClient(creds TwitterAPICreds) (*TwitterClient, error) {
-	in := &gotwi.NewClientInput{
-		AuthenticationMethod: gotwi.AuthenMethodOAuth1UserContext,
-		APIKey:               creds.APIKey,
-		APIKeySecret:         creds.APIKeySecret,
-		OAuthToken:           creds.OAuthToken,
-		OAuthTokenSecret:     creds.OAuthTokenSecret,
+func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
+	if len(creds) == 0 {
+		return nil, errors.New("at least (1) Twitter API Cred is required")
 	}
-	client, err := gotwi.NewClient(in)
-	if err != nil {
-		return nil, err
+
+	var clients []*gotwi.Client
+	for _, cred := range creds {
+		if !cred.isValid() {
+			return nil, fmt.Errorf("invalid Twitter API cred: %s", cred.String())
+		}
+
+		in := &gotwi.NewClientInput{
+			AuthenticationMethod: gotwi.AuthenMethodOAuth1UserContext,
+			APIKey:               cred.APIKey,
+			APIKeySecret:         cred.APIKeySecret,
+			OAuthToken:           cred.OAuthToken,
+			OAuthTokenSecret:     cred.OAuthTokenSecret,
+		}
+		client, err := gotwi.NewClient(in)
+		if err != nil {
+			return nil, err
+		}
+
+		clients = append(clients, client)
 	}
 
 	return &TwitterClient{
-		Client: client,
+		clients: clients,
 	}, nil
+}
+
+func (c *TwitterClient) doCreate(ctx context.Context, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
+	for _, client := range c.clients {
+		output, err := managetweet.Create(ctx, client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error publishing tweet ( %s ): %s", *p.Text, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error creating tweet ( %s ): all %d Twitter clients were rate-limited",
+		*p.Text,
+		len(c.clients),
+	)
 }
 
 func (c *TwitterClient) publishTweet(text string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 	}
-
-	output, err := managetweet.Create(context.Background(), c.Client, p)
-	if err != nil {
-		return nil, fmt.Errorf("error publishing tweet ( %s ): %s", text, err.Error())
-	}
-
-	return output, nil
+	return c.doCreate(context.Background(), p)
 }
 
 func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTypes.CreateOutput, error) {
@@ -213,13 +247,7 @@ func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTyp
 			InReplyToTweetID: tweetID,
 		},
 	}
-
-	output, err := managetweet.Create(context.Background(), c.Client, p)
-	if err != nil {
-		return nil, fmt.Errorf("error publishing tweet reply ( %s ): %s", text, err.Error())
-	}
-
-	return output, nil
+	return c.doCreate(context.Background(), p)
 }
 
 func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {

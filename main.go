@@ -36,6 +36,7 @@ func main() {
 		)
 	}
 
+	// TODO: refactor to allow many creds to be specified for the client pool:
 	api, err := newAPI(Port, AuthToken, creds)
 	if err != nil {
 		log.Fatal(err)
