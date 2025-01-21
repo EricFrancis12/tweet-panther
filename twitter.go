@@ -19,6 +19,8 @@ import (
 	managetweetTypes "github.com/michimani/gotwi/tweet/managetweet/types"
 	"github.com/michimani/gotwi/tweet/timeline"
 	timelineTypes "github.com/michimani/gotwi/tweet/timeline/types"
+	"github.com/michimani/gotwi/user/userlookup"
+	userlookupTypes "github.com/michimani/gotwi/user/userlookup/types"
 )
 
 type TwitterAPICreds struct {
@@ -311,6 +313,70 @@ func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.C
 	}
 
 	return c.publishTweetSingle(opts.Username, text)
+}
+
+func (c *TwitterClient) getUserByUsername(username, targetUsername string) (*userlookupTypes.GetByUsernameOutput, error) {
+	if targetUsername == "" {
+		return nil, errors.New("missing targetUsername")
+	}
+
+	p := &userlookupTypes.GetByUsernameInput{
+		Username: targetUsername,
+	}
+
+	if username != "" {
+		if client, ok := c.getClientByUsername(username); ok {
+			return userlookup.GetByUsername(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("username (%s) not found in client pool", username)
+	}
+
+	for _, client := range c.clients {
+		output, err := userlookup.GetByUsername(context.Background(), client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error getting user by username ( %s ): %s", targetUsername, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error getting user by username ( %s ): all (%d) Twitter client(s) were rate-limited",
+		targetUsername,
+		len(c.clients),
+	)
+}
+
+func (c *TwitterClient) getUserByID(username, targetUserID string) (*userlookupTypes.GetOutput, error) {
+	if targetUserID == "" {
+		return nil, errors.New("missing targetUserID")
+	}
+
+	p := &userlookupTypes.GetInput{
+		ID: targetUserID,
+	}
+
+	if username != "" {
+		if client, ok := c.getClientByUsername(username); ok {
+			return userlookup.Get(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("username (%s) not found in client pool", username)
+	}
+
+	for _, client := range c.clients {
+		output, err := userlookup.Get(context.Background(), client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error getting user by ID ( %s ): %s", targetUserID, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error getting user by ID ( %s ): all (%d) Twitter client(s) were rate-limited",
+		targetUserID,
+		len(c.clients),
+	)
 }
 
 func (c *TwitterClient) getUserSingleTweets(username, targetUserID string) (*timelineTypes.ListTweetsOutput, error) {

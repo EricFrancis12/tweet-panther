@@ -80,11 +80,15 @@ func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
 
 func (a *API) init() {
 	a.router.HandleFunc("/api/tweet", a.auth(a.handlePublishTweet)).Methods(http.MethodPost)
+
+	a.router.HandleFunc("/api/users/by/username/{targetUsername}", a.auth(a.handleGetUserByUsername)).Methods(http.MethodGet)
+	a.router.HandleFunc("/api/users/{targetUserID}", a.auth(a.handleGetUserByID)).Methods(http.MethodGet)
 	a.router.HandleFunc("/api/users/{targetUserID}/tweets", a.auth(a.handleGetUserTweets)).Methods(http.MethodGet)
 
 	a.router.HandleFunc("/healthz", a.handleHealthz)
-	a.router.HandleFunc("/", a.handleCatchAll)
-	a.router.HandleFunc(`/{catchAll:[a-zA-Z0-9=\-\/.]+}`, a.handleCatchAll)
+	for _, path := range []string{"/", `/{catchAll:[a-zA-Z0-9=\-\/.]+}`} {
+		a.router.HandleFunc(path, a.handleCatchAll)
+	}
 }
 
 func (a *API) run() error {
@@ -110,6 +114,46 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.Infof("Published new Tweet (%s): %s\n", *output.Data.ID, *output.Data.Text)
+	writeOK(w, output)
+}
+
+func (a *API) handleGetUserByUsername(w http.ResponseWriter, r *http.Request) {
+	targetUsername := mux.Vars(r)[MuxVarTargetUsername]
+	if targetUsername == "" {
+		a.Errorf("missing path variable (%s)\n", MuxVarTargetUsername)
+		writeBadRequest(w, nil)
+		return
+	}
+
+	username := r.URL.Query().Get(QueryParamUsername)
+	output, err := a.client.getUserByUsername(username, targetUsername)
+	if err != nil {
+		a.LogErr(err)
+		writeInternalServerError(w, nil)
+		return
+	}
+
+	a.Infof("Retrieved user by username (%s)\n", targetUsername)
+	writeOK(w, output)
+}
+
+func (a *API) handleGetUserByID(w http.ResponseWriter, r *http.Request) {
+	targetUserID := mux.Vars(r)[MuxVarTargetUserID]
+	if targetUserID == "" {
+		a.Errorf("missing path variable (%s)\n", MuxVarTargetUserID)
+		writeBadRequest(w, nil)
+		return
+	}
+
+	username := r.URL.Query().Get(QueryParamUsername)
+	output, err := a.client.getUserByID(username, targetUserID)
+	if err != nil {
+		a.LogErr(err)
+		writeInternalServerError(w, nil)
+		return
+	}
+
+	a.Infof("Retrieved user by user ID (%s)\n", targetUserID)
 	writeOK(w, output)
 }
 

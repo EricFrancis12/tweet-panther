@@ -49,7 +49,8 @@ const (
 )
 
 const (
-	MuxVarTargetUserID string = "targetUserID"
+	MuxVarTargetUserID   string = "targetUserID"
+	MuxVarTargetUsername string = "targetUsername"
 )
 
 type PublishTweetType string
