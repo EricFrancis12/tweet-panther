@@ -22,7 +22,7 @@ import (
 )
 
 type TwitterAPICreds struct {
-	UserName         string
+	Username         string
 	APIKey           string
 	APIKeySecret     string
 	OAuthToken       string
@@ -30,7 +30,7 @@ type TwitterAPICreds struct {
 }
 
 func (tac TwitterAPICreds) isValid() bool {
-	return tac.UserName != "" && tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
+	return tac.Username != "" && tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
 }
 
 func (tac TwitterAPICreds) String() string {
@@ -48,7 +48,7 @@ type PublishTweetOpts struct {
 	Text             string           `json:"text"`
 	ReplyTo          string           `json:"replyTo"`
 	Url              string           `json:"url"`
-	UserName         string           `json:"userName"`
+	Username         string           `json:"username"`
 }
 
 func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
@@ -221,13 +221,13 @@ func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
 	}, nil
 }
 
-func (c *TwitterClient) getClientByUserName(userName string) (*gotwi.Client, bool) {
-	if userName == "" {
+func (c *TwitterClient) getClientByUsername(username string) (*gotwi.Client, bool) {
+	if username == "" {
 		return nil, false
 	}
 
 	for cred, client := range c.clients {
-		if cred.UserName == userName {
+		if cred.Username == username {
 			return client, true
 		}
 	}
@@ -235,12 +235,12 @@ func (c *TwitterClient) getClientByUserName(userName string) (*gotwi.Client, boo
 	return nil, false
 }
 
-func (c *TwitterClient) doCreate(userName string, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
-	if userName != "" {
-		if client, ok := c.getClientByUserName(userName); ok {
+func (c *TwitterClient) doCreate(username string, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
+	if username != "" {
+		if client, ok := c.getClientByUsername(username); ok {
 			return managetweet.Create(context.Background(), client, p)
 		}
-		return nil, fmt.Errorf("userName (%s) not found in client pool", userName)
+		return nil, fmt.Errorf("username (%s) not found in client pool", username)
 	}
 
 	for _, client := range c.clients {
@@ -259,21 +259,21 @@ func (c *TwitterClient) doCreate(userName string, p *managetweetTypes.CreateInpu
 	)
 }
 
-func (c *TwitterClient) publishTweetSingle(userName, text string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweetSingle(username, text string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 	}
-	return c.doCreate(userName, p)
+	return c.doCreate(username, p)
 }
 
-func (c *TwitterClient) publishTweetReply(userName, text, tweetID string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweetReply(username, text, tweetID string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 		Reply: &managetweetTypes.CreateInputReply{
 			InReplyToTweetID: tweetID,
 		},
 	}
-	return c.doCreate(userName, p)
+	return c.doCreate(username, p)
 }
 
 func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
@@ -307,13 +307,13 @@ func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.C
 		if err != nil {
 			return nil, err
 		}
-		return c.publishTweetReply(opts.UserName, text, tweetID)
+		return c.publishTweetReply(opts.Username, text, tweetID)
 	}
 
-	return c.publishTweetSingle(opts.UserName, text)
+	return c.publishTweetSingle(opts.Username, text)
 }
 
-func (c *TwitterClient) getUserSingleTweets(userName, targetUserID string) (*timelineTypes.ListTweetsOutput, error) {
+func (c *TwitterClient) getUserSingleTweets(username, targetUserID string) (*timelineTypes.ListTweetsOutput, error) {
 	if targetUserID == "" {
 		return nil, errors.New("missing targetUserID")
 	}
@@ -326,11 +326,11 @@ func (c *TwitterClient) getUserSingleTweets(userName, targetUserID string) (*tim
 		},
 	}
 
-	if userName != "" {
-		if client, ok := c.getClientByUserName(userName); ok {
+	if username != "" {
+		if client, ok := c.getClientByUsername(username); ok {
 			return timeline.ListTweets(context.Background(), client, p)
 		}
-		return nil, fmt.Errorf("userName (%s) not found in client pool", userName)
+		return nil, fmt.Errorf("username (%s) not found in client pool", username)
 	}
 
 	for _, client := range c.clients {

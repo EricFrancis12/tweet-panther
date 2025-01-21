@@ -12,7 +12,7 @@ func main() {
 
 	var (
 		Port             string = os.Getenv(EnvPort)
-		UserName         string = os.Getenv(EnvUserName)
+		Username         string = os.Getenv(EnvUsername)
 		AuthToken        string = os.Getenv(EnvAuthToken)
 		APIKey           string = os.Getenv(EnvAPIKey)
 		APIKeySecret     string = os.Getenv(EnvAPIKeySecret)
@@ -25,7 +25,7 @@ func main() {
 	}
 
 	creds := TwitterAPICreds{
-		UserName:         UserName,
+		Username:         Username,
 		APIKey:           APIKey,
 		APIKeySecret:     APIKeySecret,
 		OAuthToken:       OAuthToken,
@@ -34,7 +34,7 @@ func main() {
 	if !creds.isValid() {
 		log.Fatalf(
 			"required Twitter API credentials from .env: (%s), (%s), (%s), (%s), (%s)",
-			EnvUserName, EnvAPIKey, EnvAPIKeySecret, EnvOAuthToken, EnvOAuthTokenSecret,
+			EnvUsername, EnvAPIKey, EnvAPIKeySecret, EnvOAuthToken, EnvOAuthTokenSecret,
 		)
 	}
 
