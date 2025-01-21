@@ -16,9 +16,12 @@ import (
 	"github.com/michimani/gotwi"
 	"github.com/michimani/gotwi/tweet/managetweet"
 	managetweetTypes "github.com/michimani/gotwi/tweet/managetweet/types"
+	"github.com/michimani/gotwi/tweet/timeline"
+	timelineTypes "github.com/michimani/gotwi/tweet/timeline/types"
 )
 
 type TwitterAPICreds struct {
+	UserID           string
 	APIKey           string
 	APIKeySecret     string
 	OAuthToken       string
@@ -26,7 +29,7 @@ type TwitterAPICreds struct {
 }
 
 func (tac TwitterAPICreds) isValid() bool {
-	return tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
+	return tac.UserID != "" && tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
 }
 
 func (tac TwitterAPICreds) String() string {
@@ -44,6 +47,7 @@ type PublishTweetOpts struct {
 	Text             string           `json:"text"`
 	ReplyTo          string           `json:"replyTo"`
 	Url              string           `json:"url"`
+	UserID           string           `json:"userId"`
 }
 
 func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
@@ -117,7 +121,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	return f.Eval(ipol.Eval(text))
 }
 
-func (o PublishTweetOpts) replyToTweetID() (string, error) {
+func (o PublishTweetOpts) getReplyToTweetID() (string, error) {
 	if o.ReplyTo == "" {
 		return "", errors.New("replyTo is an empty string")
 	}
@@ -142,7 +146,7 @@ func (o PublishTweetOpts) replyToTweetID() (string, error) {
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
-	_, err := o.replyToTweetID()
+	_, err := o.getReplyToTweetID()
 	return err == nil
 }
 
@@ -182,7 +186,7 @@ func (o PublishTweetOpts) String() string {
 }
 
 type TwitterClient struct {
-	clients []*gotwi.Client
+	clients map[TwitterAPICreds]*gotwi.Client
 }
 
 func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
@@ -190,7 +194,7 @@ func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
 		return nil, errors.New("at least (1) Twitter API Cred is required")
 	}
 
-	var clients []*gotwi.Client
+	var clients = make(map[TwitterAPICreds]*gotwi.Client)
 	for _, cred := range creds {
 		if !cred.isValid() {
 			return nil, fmt.Errorf("invalid Twitter API cred: %s", cred.String())
@@ -208,7 +212,7 @@ func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
 			return nil, err
 		}
 
-		clients = append(clients, client)
+		clients[cred] = client
 	}
 
 	return &TwitterClient{
@@ -216,9 +220,30 @@ func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
 	}, nil
 }
 
-func (c *TwitterClient) doCreate(ctx context.Context, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) getClientByUserID(userID string) (*gotwi.Client, bool) {
+	if userID == "" {
+		return nil, false
+	}
+
+	for cred, client := range c.clients {
+		if cred.UserID == userID {
+			return client, true
+		}
+	}
+
+	return nil, false
+}
+
+func (c *TwitterClient) doCreate(userID string, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
+	if userID != "" {
+		if client, ok := c.getClientByUserID(userID); ok {
+			return managetweet.Create(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("userID (%s) not found in client pool", userID)
+	}
+
 	for _, client := range c.clients {
-		output, err := managetweet.Create(ctx, client, p)
+		output, err := managetweet.Create(context.Background(), client, p)
 		if err == nil {
 			return output, nil
 		} else if !isRateLimitErr(err) {
@@ -233,24 +258,24 @@ func (c *TwitterClient) doCreate(ctx context.Context, p *managetweetTypes.Create
 	)
 }
 
-func (c *TwitterClient) publishTweet(text string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishNewTweet(userID, text string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 	}
-	return c.doCreate(context.Background(), p)
+	return c.doCreate(userID, p)
 }
 
-func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweetReply(userID, text, tweetID string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 		Reply: &managetweetTypes.CreateInputReply{
 			InReplyToTweetID: tweetID,
 		},
 	}
-	return c.doCreate(context.Background(), p)
+	return c.doCreate(userID, p)
 }
 
-func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
 	var text = ""
 	switch opts.PublishTweetType {
 	case PublishTweetTypeText:
@@ -277,12 +302,45 @@ func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateO
 	}
 
 	if opts.validReplyTo() {
-		tweetID, err := opts.replyToTweetID()
+		tweetID, err := opts.getReplyToTweetID()
 		if err != nil {
 			return nil, err
 		}
-		return c.publishTweetReply(text, tweetID)
+		return c.publishTweetReply(opts.UserID, text, tweetID)
 	}
 
-	return c.publishTweet(text)
+	return c.publishNewTweet(opts.UserID, text)
+}
+
+func (c *TwitterClient) getUserTweets(userID, targetUserID string) (*timelineTypes.ListTweetsOutput, error) {
+	if targetUserID == "" {
+		return nil, errors.New("missing targetUserID")
+	}
+
+	p := &timelineTypes.ListTweetsInput{
+		ID: targetUserID,
+	}
+
+	if userID != "" {
+		if client, ok := c.getClientByUserID(userID); ok {
+			// TODO: fix timeline.ListTweets() returning 400 lever error (invalid request)
+			return timeline.ListTweets(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("userID (%s) not found in client pool", userID)
+	}
+
+	for _, client := range c.clients {
+		output, err := timeline.ListTweets(context.Background(), client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error getting tweets for user ( %s ): %s", targetUserID, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error getting tweets for user ( %s ): all (%d) Twitter client(s) were rate-limited",
+		targetUserID,
+		len(c.clients),
+	)
 }

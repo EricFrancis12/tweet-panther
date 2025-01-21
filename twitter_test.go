@@ -121,14 +121,14 @@ func TestPublishTweetOpts(t *testing.T) {
 		}
 	})
 
-	t.Run("Test replyToTweetID()", func(t *testing.T) {
-		type ReplyToTweetIDTest struct {
+	t.Run("Test getReplyToTweetID()", func(t *testing.T) {
+		type GetReplyToTweetIDTest struct {
 			replyTo   string
 			expected  string
 			shouldErr bool
 		}
 
-		tests := []ReplyToTweetIDTest{
+		tests := []GetReplyToTweetIDTest{
 			// Empty string
 			{
 				replyTo:   "",
@@ -201,7 +201,7 @@ func TestPublishTweetOpts(t *testing.T) {
 				ReplyTo: test.replyTo,
 			}
 
-			tweetID, err := opts.replyToTweetID()
+			tweetID, err := opts.getReplyToTweetID()
 			assert.Equal(t, test.expected, tweetID)
 			if test.shouldErr {
 				assert.NotNil(t, err)

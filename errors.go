@@ -8,7 +8,9 @@ func isRateLimitErr(err error) bool {
 	}
 	return containsAnySubstrs(
 		strings.ToLower(err.Error()),
+		"ratelimit",
 		"rate limit",
 		"rate-limit",
+		"rate_limit",
 	)
 }
