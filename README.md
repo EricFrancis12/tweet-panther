@@ -14,7 +14,7 @@ make create_env
 
 - `PORT`
 - `AUTH_TOKEN`
-- `USER_ID`
+- `USER_NAME`
 - `API_KEY`
 - `API_KEY_SECRET`
 - `O_AUTH_TOKEN`

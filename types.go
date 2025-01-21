@@ -27,7 +27,7 @@ const (
 
 const (
 	EnvPort                string = "PORT"
-	EnvUserID              string = "USER_ID"
+	EnvUserName            string = "USER_NAME"
 	EnvAuthToken           string = "AUTH_TOKEN"
 	EnvAPIKey              string = "API_KEY"
 	EnvAPIKeySecret        string = "API_KEY_SECRET"
@@ -60,5 +60,5 @@ const (
 )
 
 const (
-	QueryParamUserID string = "userId"
+	QueryParamUserName string = "userName"
 )

@@ -121,15 +121,15 @@ func (a *API) handleGetUserTweets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.URL.Query().Get(QueryParamUserID)
-	output, err := a.client.getUserTweets(userID, targetUserID)
+	userName := r.URL.Query().Get(QueryParamUserName)
+	output, err := a.client.getUserSingleTweets(userName, targetUserID)
 	if err != nil {
 		a.LogErr(err)
 		writeInternalServerError(w, nil)
 		return
 	}
 
-	a.Infof("Retrieved (%d) tweets from user (%s)\n", len(output.Includes.Tweets), userID)
+	a.Infof("Retrieved (%d) tweets from user (%s)\n", len(output.Includes.Tweets), userName)
 	writeOK(w, output)
 }
 
