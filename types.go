@@ -21,10 +21,13 @@ func (b *ByteReadCloser) Close() error {
 	return nil
 }
 
-const ContentTypeApplicationJson string = "application/json"
+const (
+	ContentTypeApplicationJson string = "application/json"
+)
 
 const (
 	EnvPort                string = "PORT"
+	EnvUserName            string = "USER_NAME"
 	EnvAuthToken           string = "AUTH_TOKEN"
 	EnvAPIKey              string = "API_KEY"
 	EnvAPIKeySecret        string = "API_KEY_SECRET"
@@ -45,9 +48,17 @@ const (
 	LogLevelError LogLevel = "error"
 )
 
+const (
+	MuxVarTargetUserID string = "targetUserID"
+)
+
 type PublishTweetType string
 
 const (
 	PublishTweetTypeText      PublishTweetType = "text"
 	PublishTweetTypeFetchJson PublishTweetType = "fetch_json"
+)
+
+const (
+	QueryParamUserName string = "userName"
 )

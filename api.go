@@ -33,7 +33,7 @@ type API struct {
 	*Logger
 }
 
-func newAPI(listenAddr string, authToken string, creds TwitterAPICreds) (*API, error) {
+func newAPI(listenAddr string, authToken string, creds ...TwitterAPICreds) (*API, error) {
 	la := ensurePrefix(listenAddr, ":")
 	if !allCharsNumeric(la[1:]) {
 		return nil, fmt.Errorf("invalid listen address: %s", listenAddr)
@@ -80,6 +80,7 @@ func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
 
 func (a *API) init() {
 	a.router.HandleFunc("/api/tweet", a.auth(a.handlePublishTweet)).Methods(http.MethodPost)
+	a.router.HandleFunc("/api/users/{targetUserID}/tweets", a.auth(a.handleGetUserTweets)).Methods(http.MethodGet)
 
 	a.router.HandleFunc("/healthz", a.handleHealthz)
 	a.router.HandleFunc("/", a.handleCatchAll)
@@ -101,7 +102,7 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 
 	a.Infoln(opts.String())
 
-	output, err := a.client.handle(opts)
+	output, err := a.client.publishTweet(opts)
 	if err != nil {
 		a.LogErr(err)
 		writeInternalServerError(w, nil)
@@ -109,6 +110,26 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.Infof("Published new Tweet (%s): %s\n", *output.Data.ID, *output.Data.Text)
+	writeOK(w, output)
+}
+
+func (a *API) handleGetUserTweets(w http.ResponseWriter, r *http.Request) {
+	targetUserID := mux.Vars(r)[MuxVarTargetUserID]
+	if targetUserID == "" {
+		a.Errorf("missing path variable (%s)\n", MuxVarTargetUserID)
+		writeBadRequest(w, nil)
+		return
+	}
+
+	userName := r.URL.Query().Get(QueryParamUserName)
+	output, err := a.client.getUserSingleTweets(userName, targetUserID)
+	if err != nil {
+		a.LogErr(err)
+		writeInternalServerError(w, nil)
+		return
+	}
+
+	a.Infof("Retrieved (%d) tweets from user (%s)\n", len(output.Includes.Tweets), userName)
 	writeOK(w, output)
 }
 

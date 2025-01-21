@@ -12,6 +12,7 @@ func main() {
 
 	var (
 		Port             string = os.Getenv(EnvPort)
+		UserName         string = os.Getenv(EnvUserName)
 		AuthToken        string = os.Getenv(EnvAuthToken)
 		APIKey           string = os.Getenv(EnvAPIKey)
 		APIKeySecret     string = os.Getenv(EnvAPIKeySecret)
@@ -24,6 +25,7 @@ func main() {
 	}
 
 	creds := TwitterAPICreds{
+		UserName:         UserName,
 		APIKey:           APIKey,
 		APIKeySecret:     APIKeySecret,
 		OAuthToken:       OAuthToken,
@@ -31,11 +33,12 @@ func main() {
 	}
 	if !creds.isValid() {
 		log.Fatalf(
-			"required Twitter API credentials from .env: (%s), (%s), (%s), (%s)",
-			EnvAPIKey, EnvAPIKeySecret, EnvOAuthToken, EnvOAuthTokenSecret,
+			"required Twitter API credentials from .env: (%s), (%s), (%s), (%s), (%s)",
+			EnvUserName, EnvAPIKey, EnvAPIKeySecret, EnvOAuthToken, EnvOAuthTokenSecret,
 		)
 	}
 
+	// TODO: refactor to allow many creds to be specified for the client pool:
 	api, err := newAPI(Port, AuthToken, creds)
 	if err != nil {
 		log.Fatal(err)

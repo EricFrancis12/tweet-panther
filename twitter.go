@@ -14,11 +14,15 @@ import (
 
 	"github.com/EricFrancis12/stripol"
 	"github.com/michimani/gotwi"
+	"github.com/michimani/gotwi/fields"
 	"github.com/michimani/gotwi/tweet/managetweet"
 	managetweetTypes "github.com/michimani/gotwi/tweet/managetweet/types"
+	"github.com/michimani/gotwi/tweet/timeline"
+	timelineTypes "github.com/michimani/gotwi/tweet/timeline/types"
 )
 
 type TwitterAPICreds struct {
+	UserName         string
 	APIKey           string
 	APIKeySecret     string
 	OAuthToken       string
@@ -26,7 +30,17 @@ type TwitterAPICreds struct {
 }
 
 func (tac TwitterAPICreds) isValid() bool {
-	return tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
+	return tac.UserName != "" && tac.APIKey != "" && tac.APIKeySecret != "" && tac.OAuthToken != "" && tac.OAuthTokenSecret != ""
+}
+
+func (tac TwitterAPICreds) String() string {
+	return fmt.Sprintf(
+		"TwitterAPICreds{ APIKey: %s, APIKeySecret: %s, OAuthToken: %s, OAuthTokenSecret: %s }",
+		tac.APIKey,
+		tac.APIKeySecret,
+		tac.OAuthToken,
+		tac.OAuthTokenSecret,
+	)
 }
 
 type PublishTweetOpts struct {
@@ -34,6 +48,7 @@ type PublishTweetOpts struct {
 	Text             string           `json:"text"`
 	ReplyTo          string           `json:"replyTo"`
 	Url              string           `json:"url"`
+	UserName         string           `json:"userName"`
 }
 
 func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
@@ -107,7 +122,7 @@ func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, erro
 	return f.Eval(ipol.Eval(text))
 }
 
-func (o PublishTweetOpts) replyToTweetID() (string, error) {
+func (o PublishTweetOpts) getReplyToTweetID() (string, error) {
 	if o.ReplyTo == "" {
 		return "", errors.New("replyTo is an empty string")
 	}
@@ -132,7 +147,7 @@ func (o PublishTweetOpts) replyToTweetID() (string, error) {
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
-	_, err := o.replyToTweetID()
+	_, err := o.getReplyToTweetID()
 	return err == nil
 }
 
@@ -172,57 +187,96 @@ func (o PublishTweetOpts) String() string {
 }
 
 type TwitterClient struct {
-	*gotwi.Client
+	clients map[TwitterAPICreds]*gotwi.Client
 }
 
-func newTwitterClient(creds TwitterAPICreds) (*TwitterClient, error) {
-	in := &gotwi.NewClientInput{
-		AuthenticationMethod: gotwi.AuthenMethodOAuth1UserContext,
-		APIKey:               creds.APIKey,
-		APIKeySecret:         creds.APIKeySecret,
-		OAuthToken:           creds.OAuthToken,
-		OAuthTokenSecret:     creds.OAuthTokenSecret,
+func newTwitterClient(creds []TwitterAPICreds) (*TwitterClient, error) {
+	if len(creds) == 0 {
+		return nil, errors.New("at least (1) Twitter API Cred is required")
 	}
-	client, err := gotwi.NewClient(in)
-	if err != nil {
-		return nil, err
+
+	var clients = make(map[TwitterAPICreds]*gotwi.Client)
+	for _, cred := range creds {
+		if !cred.isValid() {
+			return nil, fmt.Errorf("invalid Twitter API cred: %s", cred.String())
+		}
+
+		in := &gotwi.NewClientInput{
+			AuthenticationMethod: gotwi.AuthenMethodOAuth1UserContext,
+			APIKey:               cred.APIKey,
+			APIKeySecret:         cred.APIKeySecret,
+			OAuthToken:           cred.OAuthToken,
+			OAuthTokenSecret:     cred.OAuthTokenSecret,
+		}
+		client, err := gotwi.NewClient(in)
+		if err != nil {
+			return nil, err
+		}
+
+		clients[cred] = client
 	}
 
 	return &TwitterClient{
-		Client: client,
+		clients: clients,
 	}, nil
 }
 
-func (c *TwitterClient) publishTweet(text string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) getClientByUserName(userName string) (*gotwi.Client, bool) {
+	if userName == "" {
+		return nil, false
+	}
+
+	for cred, client := range c.clients {
+		if cred.UserName == userName {
+			return client, true
+		}
+	}
+
+	return nil, false
+}
+
+func (c *TwitterClient) doCreate(userName string, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
+	if userName != "" {
+		if client, ok := c.getClientByUserName(userName); ok {
+			return managetweet.Create(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("userName (%s) not found in client pool", userName)
+	}
+
+	for _, client := range c.clients {
+		output, err := managetweet.Create(context.Background(), client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error publishing tweet ( %s ): %s", *p.Text, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error creating tweet ( %s ): all %d Twitter clients were rate-limited",
+		*p.Text,
+		len(c.clients),
+	)
+}
+
+func (c *TwitterClient) publishTweetSingle(userName, text string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 	}
-
-	output, err := managetweet.Create(context.Background(), c.Client, p)
-	if err != nil {
-		return nil, fmt.Errorf("error publishing tweet ( %s ): %s", text, err.Error())
-	}
-
-	return output, nil
+	return c.doCreate(userName, p)
 }
 
-func (c *TwitterClient) publishTweetReply(text, tweetID string) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweetReply(userName, text, tweetID string) (*managetweetTypes.CreateOutput, error) {
 	p := &managetweetTypes.CreateInput{
 		Text: gotwi.String(text),
 		Reply: &managetweetTypes.CreateInputReply{
 			InReplyToTweetID: tweetID,
 		},
 	}
-
-	output, err := managetweet.Create(context.Background(), c.Client, p)
-	if err != nil {
-		return nil, fmt.Errorf("error publishing tweet reply ( %s ): %s", text, err.Error())
-	}
-
-	return output, nil
+	return c.doCreate(userName, p)
 }
 
-func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
+func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.CreateOutput, error) {
 	var text = ""
 	switch opts.PublishTweetType {
 	case PublishTweetTypeText:
@@ -249,12 +303,48 @@ func (c *TwitterClient) handle(opts PublishTweetOpts) (*managetweetTypes.CreateO
 	}
 
 	if opts.validReplyTo() {
-		tweetID, err := opts.replyToTweetID()
+		tweetID, err := opts.getReplyToTweetID()
 		if err != nil {
 			return nil, err
 		}
-		return c.publishTweetReply(text, tweetID)
+		return c.publishTweetReply(opts.UserName, text, tweetID)
 	}
 
-	return c.publishTweet(text)
+	return c.publishTweetSingle(opts.UserName, text)
+}
+
+func (c *TwitterClient) getUserSingleTweets(userName, targetUserID string) (*timelineTypes.ListTweetsOutput, error) {
+	if targetUserID == "" {
+		return nil, errors.New("missing targetUserID")
+	}
+
+	p := &timelineTypes.ListTweetsInput{
+		ID: targetUserID,
+		Exclude: fields.ExcludeList{
+			fields.ExcludeReplies,
+			fields.ExcludeRetweets,
+		},
+	}
+
+	if userName != "" {
+		if client, ok := c.getClientByUserName(userName); ok {
+			return timeline.ListTweets(context.Background(), client, p)
+		}
+		return nil, fmt.Errorf("userName (%s) not found in client pool", userName)
+	}
+
+	for _, client := range c.clients {
+		output, err := timeline.ListTweets(context.Background(), client, p)
+		if err == nil {
+			return output, nil
+		} else if !isRateLimitErr(err) {
+			return nil, fmt.Errorf("error getting tweets for user ( %s ): %s", targetUserID, err.Error())
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"error getting tweets for user ( %s ): all (%d) Twitter client(s) were rate-limited",
+		targetUserID,
+		len(c.clients),
+	)
 }
