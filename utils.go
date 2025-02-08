@@ -39,6 +39,10 @@ func isValidUrl(s string) bool {
 	return err == nil
 }
 
+func isValidTweetID(tweetID string) bool {
+	return len(tweetID) == 19 && allCharsNumeric(tweetID)
+}
+
 func ensurePrefix(s, prefix string) string {
 	if len(s) == 0 {
 		return prefix

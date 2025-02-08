@@ -141,11 +141,11 @@ func (o PublishTweetOpts) getReplyToTweetID() (string, error) {
 		tweetID = parts[len(parts)-1]
 	}
 
-	if len(tweetID) == 19 && allCharsNumeric(tweetID) {
-		return tweetID, nil
+	if !isValidTweetID(tweetID) {
+		return "", errInvalidTweetID(tweetID)
 	}
 
-	return "", fmt.Errorf("tweet ID must be 19 characters long, and contain only numeric characters (received: %s)", tweetID)
+	return tweetID, nil
 }
 
 func (o PublishTweetOpts) validReplyTo() bool {
