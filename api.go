@@ -80,6 +80,7 @@ func (a *API) auth(h http.HandlerFunc) http.HandlerFunc {
 
 func (a *API) init() {
 	a.router.HandleFunc("/api/tweet", a.auth(a.handlePublishTweet)).Methods(http.MethodPost)
+	a.router.HandleFunc("/api/tweet/{tweetID}/isReply", a.auth(a.handleTweetIsReply)).Methods(http.MethodGet)
 
 	a.router.HandleFunc("/api/users/by/username/{targetUsername}", a.auth(a.handleGetUserByUsername)).Methods(http.MethodGet)
 	a.router.HandleFunc("/api/users/{targetUserID}", a.auth(a.handleGetUserByID)).Methods(http.MethodGet)
@@ -115,6 +116,29 @@ func (a *API) handlePublishTweet(w http.ResponseWriter, r *http.Request) {
 
 	a.Infof("Published new Tweet (%s): %s\n", *output.Data.ID, *output.Data.Text)
 	writeOK(w, output)
+}
+
+func (a *API) handleTweetIsReply(w http.ResponseWriter, r *http.Request) {
+	tweetID := mux.Vars(r)[MuxVarTweetID]
+	if tweetID == "" {
+		a.Errorf("missing path variable (%s)\n", MuxVarTweetID)
+		writeBadRequest(w, nil)
+		return
+	}
+
+	isReply, err := a.client.tweetIsReply(tweetID)
+	if err != nil {
+		a.LogErr(err)
+		writeInternalServerError(w, nil)
+		return
+	}
+
+	if isReply {
+		a.Infof("Tweet (%s) is a reply\n", tweetID)
+	} else {
+		a.Infof("Tweet (%s) is not a reply\n", tweetID)
+	}
+	writeOK(w, isReply)
 }
 
 func (a *API) handleGetUserByUsername(w http.ResponseWriter, r *http.Request) {

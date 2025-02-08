@@ -19,6 +19,8 @@ import (
 	managetweetTypes "github.com/michimani/gotwi/tweet/managetweet/types"
 	"github.com/michimani/gotwi/tweet/timeline"
 	timelineTypes "github.com/michimani/gotwi/tweet/timeline/types"
+	"github.com/michimani/gotwi/tweet/tweetlookup"
+	tweetlookupTypes "github.com/michimani/gotwi/tweet/tweetlookup/types"
 	"github.com/michimani/gotwi/user/userlookup"
 	userlookupTypes "github.com/michimani/gotwi/user/userlookup/types"
 )
@@ -51,6 +53,7 @@ type PublishTweetOpts struct {
 	ReplyTo          string           `json:"replyTo"`
 	Url              string           `json:"url"`
 	Username         string           `json:"username"`
+	IgnoreReplies    bool             `json:"ignoreReplies"`
 }
 
 func (o PublishTweetOpts) handleFetchJsonResp(resp *http.Response) (string, error) {
@@ -237,6 +240,31 @@ func (c *TwitterClient) getClientByUsername(username string) (*gotwi.Client, boo
 	return nil, false
 }
 
+func (c *TwitterClient) tweetIsReply(tweetID string) (bool, error) {
+	if !isValidTweetID(tweetID) {
+		return false, fmt.Errorf("invalid tweetID: (%s)", tweetID)
+	}
+
+	p := &tweetlookupTypes.GetInput{
+		ID: tweetID,
+	}
+
+	for _, client := range c.clients {
+		output, err := tweetlookup.Get(context.Background(), client, p)
+		if err == nil {
+			return output.Data.InReplyToUserID != nil && *output.Data.InReplyToUserID != "", nil
+		} else if !isRateLimitErr(err) {
+			return false, fmt.Errorf("error checking if tweet ( %s ) is a reply: %s", p.ID, err.Error())
+		}
+	}
+
+	return false, fmt.Errorf(
+		"error checking if tweet ( %s ) is a reply: all %d Twitter clients were rate-limited",
+		p.ID,
+		len(c.clients),
+	)
+}
+
 func (c *TwitterClient) doCreate(username string, p *managetweetTypes.CreateInput) (*managetweetTypes.CreateOutput, error) {
 	if username != "" {
 		if client, ok := c.getClientByUsername(username); ok {
@@ -309,6 +337,22 @@ func (c *TwitterClient) publishTweet(opts PublishTweetOpts) (*managetweetTypes.C
 		if err != nil {
 			return nil, err
 		}
+
+		if !isValidTweetID(tweetID) {
+			return nil, fmt.Errorf("invalid tweetID: (%s)", tweetID)
+		}
+
+		if opts.IgnoreReplies {
+			isReply, err := c.tweetIsReply(tweetID)
+			if err != nil {
+				return nil, err
+			}
+
+			if isReply {
+				return nil, fmt.Errorf("tweet ID (%s) is a reply", tweetID)
+			}
+		}
+
 		return c.publishTweetReply(opts.Username, text, tweetID)
 	}
 
