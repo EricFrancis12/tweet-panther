@@ -11,7 +11,7 @@ import (
 )
 
 type APIResp struct {
-	Success bool   `json:"success,omitempty"`
+	Success bool   `json:"success"`
 	Msg     string `json:"msg,omitempty"`
 	Data    any    `json:"data,omitempty"`
 }
